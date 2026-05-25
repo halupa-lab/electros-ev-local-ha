@@ -83,16 +83,7 @@ def parse_charger_state(message: str) -> dict:
     # anchor+6: mains voltage current (V)
     mains_voltage = safe_int_rel(6)
 
-    # anchor+7: measured current raw / 10630 = A
-    # e.g. 103120 / 10630 ≈ 9.7A
-    measured_current = None
-    try:
-        mc_raw = safe_int_rel(7)
-        if mc_raw is not None and mc_raw > 0:
-            measured_current = round(mc_raw / 10630, 1)
-    except (ValueError, IndexError):
-        pass
-
+    # anchor+7: NOT measured current — appears to be an energy counter
     # anchor+8: charging power raw / 10 = W
     # e.g. 21070 / 10 = 2107W ≈ 2.1 kW
     charging_power_w = None
@@ -102,6 +93,12 @@ def parse_charger_state(message: str) -> dict:
             charging_power_w = round(pw_raw / 10, 0)
     except (ValueError, IndexError):
         pass
+
+    # Measured current: calculated from power and voltage
+    # e.g. 2107W / 217V ≈ 9.7A
+    measured_current = None
+    if charging_power_w is not None and mains_voltage is not None and mains_voltage > 0:
+        measured_current = round(charging_power_w / mains_voltage, 1)
 
     return {
         "online": status_code != "7",
