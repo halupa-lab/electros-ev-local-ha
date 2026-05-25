@@ -33,69 +33,73 @@ def normalize_amps(amps: int) -> int:
 def parse_charger_state(message: str) -> dict:
     """Parse charger state from local WebSocket message.
 
-    Local protocol sends a large newline-delimited status message.
-    Format (based on reverse engineering):
-      line 0:  WiFi SSID
-      line 1:  WiFi password
-      line 2:  cloud password
-      line 3:  cloud host
-      line 4:  cloud port
-      line 5:  configured amps
-      line 6:  status code (00 = idle, etc.)
-      line 7:  ?
-      line 8:  ?
-      line 9:  ?
-      line 10: ?
-      line 11: mains voltage
-      ...rest: history and diagnostics
+    Uses 'electros.org.ua' as anchor to handle variable header length.
 
-    NOTE: This mapping will be refined once live charging data is captured.
+    Relative to anchor line:
+      +1: cloud port (8000)
+      +2: unknown
+      +3: configured amps
+      +4: status code (2=charging, 4=blocked, 1=connected_idle, 0=waiting)
+      +5: unknown
+      +6: mains voltage current (V)
+      +7: measured current raw (divide by 10630 to get A)
+      +8: charging power raw (divide by 10 to get W)
     """
     parts = message.split("\n")
 
-    def safe_int(idx: int, default=None):
+    # Find anchor line containing 'electros.org.ua'
+    anchor = None
+    for i, part in enumerate(parts):
+        if "electros.org.ua" in part:
+            anchor = i
+            break
+
+    if anchor is None:
+        _LOGGER.warning("Could not find anchor in message, using fallback index 4")
+        anchor = 4
+
+    def safe_int_rel(offset: int, default=None):
+        idx = anchor + offset
         try:
-            return int(parts[idx]) if len(parts) > idx and parts[idx].strip().isdigit() else default
+            val = parts[idx].strip() if len(parts) > idx else ""
+            return int(val) if val.isdigit() else default
         except (ValueError, IndexError):
             return default
 
-    def safe_str(idx: int, default=""):
+    def safe_str_rel(offset: int, default=""):
+        idx = anchor + offset
         try:
             return parts[idx].strip() if len(parts) > idx else default
         except IndexError:
             return default
 
-    # Status code (line 8): 2=charging, 4=blocked, 1=connected_idle, 0=waiting
-    raw_status = safe_str(8)
+    # anchor+3: configured amps
+    current_amps = safe_int_rel(3)
+
+    # anchor+4: status code
+    raw_status = safe_str_rel(4)
     status_code = str(int(raw_status)) if raw_status.isdigit() else None
 
-    # Configured amps (line 7)
-    current_amps_raw = safe_str(7)
-    try:
-        current_amps = int(current_amps_raw) if current_amps_raw.isdigit() else None
-    except ValueError:
-        current_amps = None
+    # anchor+6: mains voltage current (V)
+    mains_voltage = safe_int_rel(6)
 
-    # Mains voltage current (line 10)
-    mains_voltage = safe_int(10)
-
-    # Measured current (line 11): raw integer / 1220 ≈ amps
-    # e.g. 7819 / 1220 ≈ 6.4A
+    # anchor+7: measured current raw / 10630 = A
+    # e.g. 103120 / 10630 ≈ 9.7A
     measured_current = None
     try:
-        mc_raw = safe_int(11)
+        mc_raw = safe_int_rel(7)
         if mc_raw is not None and mc_raw > 0:
-            measured_current = round(mc_raw / 1220, 2)
+            measured_current = round(mc_raw / 10630, 1)
     except (ValueError, IndexError):
         pass
 
-    # Charging power (line 12): raw integer / 10000 = kW → convert to W
-    # e.g. 13824 / 10000 = 1.3824 kW = 1382.4 W
+    # anchor+8: charging power raw / 10 = W
+    # e.g. 21070 / 10 = 2107W ≈ 2.1 kW
     charging_power_w = None
     try:
-        pw_raw = safe_int(12)
+        pw_raw = safe_int_rel(8)
         if pw_raw is not None and pw_raw > 0:
-            charging_power_w = round(pw_raw / 10, 1)  # /10000 * 1000 = /10
+            charging_power_w = round(pw_raw / 10, 0)
     except (ValueError, IndexError):
         pass
 
