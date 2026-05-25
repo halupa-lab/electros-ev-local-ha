@@ -65,6 +65,10 @@ def parse_charger_state(message: str) -> dict:
         except IndexError:
             return default
 
+    # Status code (line 8): 2=charging, 4=blocked, 1=connected_idle, 0=waiting
+    raw_status = safe_str(8)
+    status_code = str(int(raw_status)) if raw_status.isdigit() else None
+
     # Configured amps (line 7)
     current_amps_raw = safe_str(7)
     try:
@@ -72,29 +76,26 @@ def parse_charger_state(message: str) -> dict:
     except ValueError:
         current_amps = None
 
-    # Status code (line 6)
-    raw_status = safe_str(6)
-    status_code = str(int(raw_status)) if raw_status.isdigit() else None
-
     # Mains voltage current (line 10)
     mains_voltage = safe_int(10)
 
-    # Measured current (line 22) — float value like "0.01175"
+    # Measured current (line 11): raw integer / 1220 ≈ amps
+    # e.g. 7819 / 1220 ≈ 6.4A
     measured_current = None
     try:
-        mc_raw = safe_str(22)
-        if mc_raw:
-            measured_current = round(float(mc_raw), 2)
+        mc_raw = safe_int(11)
+        if mc_raw is not None and mc_raw > 0:
+            measured_current = round(mc_raw / 1220, 2)
     except (ValueError, IndexError):
         pass
 
-    # Charging power (line 23) — float value in kW like "0.00155"
+    # Charging power (line 12): raw integer / 10000 = kW → convert to W
+    # e.g. 13824 / 10000 = 1.3824 kW = 1382.4 W
     charging_power_w = None
     try:
-        pw_raw = safe_str(23)
-        if pw_raw:
-            kw = float(pw_raw)
-            charging_power_w = round(kw * 1000, 1)  # convert kW to W
+        pw_raw = safe_int(12)
+        if pw_raw is not None and pw_raw > 0:
+            charging_power_w = round(pw_raw / 10, 1)  # /10000 * 1000 = /10
     except (ValueError, IndexError):
         pass
 
