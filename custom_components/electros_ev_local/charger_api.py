@@ -65,24 +65,38 @@ def parse_charger_state(message: str) -> dict:
         except IndexError:
             return default
 
-    # Configured amps (line 5)
-    current_amps = safe_int(5)
+    # Configured amps (line 7)
+    current_amps_raw = safe_str(7)
+    try:
+        current_amps = int(current_amps_raw) if current_amps_raw.isdigit() else None
+    except ValueError:
+        current_amps = None
 
-    # Status code (line 6) — "00" means idle/waiting
+    # Status code (line 6)
     raw_status = safe_str(6)
-    # Normalize: "00" -> "0", "02" -> "2" etc.
     status_code = str(int(raw_status)) if raw_status.isdigit() else None
 
-    # Mains voltage (line 11)
-    mains_voltage = safe_int(11)
+    # Mains voltage current (line 10)
+    mains_voltage = safe_int(10)
 
-    # Measured current — not yet identified in local protocol
-    # Will be updated once live charging data is available
+    # Measured current (line 22) — float value like "0.01175"
     measured_current = None
+    try:
+        mc_raw = safe_str(22)
+        if mc_raw:
+            measured_current = round(float(mc_raw), 2)
+    except (ValueError, IndexError):
+        pass
 
+    # Charging power (line 23) — float value in kW like "0.00155"
     charging_power_w = None
-    if measured_current is not None and mains_voltage is not None:
-        charging_power_w = round(measured_current * mains_voltage, 1)
+    try:
+        pw_raw = safe_str(23)
+        if pw_raw:
+            kw = float(pw_raw)
+            charging_power_w = round(kw * 1000, 1)  # convert kW to W
+    except (ValueError, IndexError):
+        pass
 
     return {
         "online": status_code != "7",
