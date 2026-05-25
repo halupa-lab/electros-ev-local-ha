@@ -1,0 +1,14 @@
+{
+  "domain": "electros_ev_local",
+  "name": "ElectroS EV Charger (Local)",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/podzolkov/electros-ev-ha-from-andriy",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/podzolkov/electros-ev-ha-from-andriy/issues",
+  "requirements": [],
+  "version": "1.0.0",
+  "integration_type": "device",
+  "icon": "mdi:ev-station"
+}

@@ -1,0 +1,22 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "ElectroS EV Charger (Local)",
+        "description": "Enter the local IP address of your ElectroS charger",
+        "data": {
+          "host": "IP address (e.g. 192.168.1.142)",
+          "port": "Port (default: 80)",
+          "scan_interval": "Update interval (seconds)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to charger at the given IP/port",
+      "unknown": "Unknown error"
+    },
+    "abort": {
+      "already_configured": "This charger is already configured"
+    }
+  }
+}

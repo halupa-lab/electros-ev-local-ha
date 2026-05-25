@@ -1,0 +1,61 @@
+"""Number platform for ElectroS EV Charger Local integration."""
+
+from __future__ import annotations
+
+import logging
+
+from homeassistant.components.number import NumberDeviceClass, NumberEntity, NumberMode
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import UnitOfElectricCurrent
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+from .charger_api import normalize_amps
+from .const import CONF_HOST, DOMAIN
+from .coordinator import ElectroSLocalCoordinator
+
+_LOGGER = logging.getLogger(__name__)
+
+
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    coordinator: ElectroSLocalCoordinator = entry.runtime_data
+    host = entry.data[CONF_HOST]
+    async_add_entities([ElectroSLocalAmpsNumber(coordinator, entry, host)])
+
+
+class ElectroSLocalAmpsNumber(CoordinatorEntity[ElectroSLocalCoordinator], NumberEntity):
+    _attr_has_entity_name = True
+    _attr_name = "Струм зарядки"
+    _attr_icon = "mdi:current-ac"
+    _attr_native_min_value = 6
+    _attr_native_max_value = 32
+    _attr_native_step = 2
+    _attr_native_unit_of_measurement = UnitOfElectricCurrent.AMPERE
+    _attr_device_class = NumberDeviceClass.CURRENT
+    _attr_mode = NumberMode.SLIDER
+
+    def __init__(self, coordinator, entry, host) -> None:
+        super().__init__(coordinator)
+        self._host = host
+        self._attr_unique_id = f"local_{host}_charging_amps"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, host)},
+            "name": f"ElectroS Local ({host})",
+            "manufacturer": "ElectroS",
+            "model": "EV Charger (Local)",
+        }
+
+    @property
+    def native_value(self):
+        return float(self.coordinator.target_amps)
+
+    async def async_set_native_value(self, value: float) -> None:
+        amps = normalize_amps(int(value))
+        if amps <= 0:
+            return
+        await self.coordinator.async_set_amps(amps)
