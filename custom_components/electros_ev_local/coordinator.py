@@ -8,6 +8,7 @@ from datetime import timedelta
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .charger_api import ElectroSLocalApi, normalize_amps
 from .const import DOMAIN
@@ -46,6 +47,9 @@ class ElectroSLocalCoordinator(DataUpdateCoordinator[dict]):
 
         if data.get("status_text", "").startswith("error"):
             raise UpdateFailed(f"Charger error: {data['status_text']}")
+
+        # When the frame was received: the charger clock in it is compared with HA time.
+        data["received_at"] = dt_util.utcnow()
 
         if not self._user_set_amps:
             charger_amps = data.get("current_amps")

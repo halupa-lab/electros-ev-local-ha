@@ -1,0 +1,17 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      # The package __init__ imports homeassistant, so the parser tests need it installed.
+      - run: pip install homeassistant pytest
+      - run: python -m pytest -q tests

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+from datetime import datetime, time
 import logging
 import os
 import ssl
@@ -28,6 +29,43 @@ def normalize_amps(amps: int) -> int:
     if not supported:
         return 0
     return max(supported)
+
+
+def parse_clock(value: str) -> datetime | None:
+    """Charger clock "10.11.2026T13:52:00" -> naive datetime (charger local time), None if invalid."""
+    try:
+        return datetime.strptime(value.strip(), "%d.%m.%YT%H:%M:%S")
+    except ValueError:
+        return None
+
+
+def _parse_hhmm(value: str) -> time | None:
+    try:
+        return datetime.strptime(value.strip(), "%H:%M").time()
+    except ValueError:
+        return None
+
+
+def parse_timer(start: str, stop: str) -> tuple[time, time] | None:
+    """Timer window, or None when the timer is off.
+
+    The web page turns the timer off by sending empty times; the charger then reports 00:00 / 00:00.
+    A window with start == stop would be empty, so it is treated as off too.
+    """
+    t_start, t_stop = _parse_hhmm(start), _parse_hhmm(stop)
+    if t_start is None or t_stop is None or t_start == t_stop:
+        return None
+    return t_start, t_stop
+
+
+def parse_events(value: str) -> list[tuple[str, str]]:
+    """Event log "HH:MM:SS code HH:MM:SS code ..." -> [(time, code)], oldest first."""
+    parts = value.split()
+    return [
+        (parts[i], parts[i + 1])
+        for i in range(0, len(parts) - 1, 2)
+        if parts[i].count(":") == 2 and parts[i + 1].isdigit()
+    ]
 
 
 def parse_charger_state(message: str) -> dict:
@@ -100,7 +138,13 @@ def parse_charger_state(message: str) -> dict:
     if charging_power_w is not None and mains_voltage is not None and mains_voltage > 0:
         measured_current = round(charging_power_w / mains_voltage, 1)
 
+    # Fields read by the charger's own web page (http://<ip>/), not used by HA before:
+    # anchor+11 charger clock "D.MM.YYYYTHH:MM:SS" (local time, set by the "datetime" command),
+    # anchor+22 / +23 timer start / stop "HH:MM", anchor+26 event log "HH:MM:SS code HH:MM:SS code ...".
     return {
+        "clock": parse_clock(safe_str_rel(11)),
+        "timer": parse_timer(safe_str_rel(22), safe_str_rel(23)),
+        "events": parse_events(safe_str_rel(26)),
         "online": status_code != "7",
         "status_code": status_code,
         "status_text": STATUS_TEXT_EN.get(status_code, "unknown"),
@@ -271,5 +315,8 @@ class ElectroSLocalApi:
             "measured_current": None,
             "mains_voltage": None,
             "charging_power_w": None,
+            "clock": None,
+            "timer": None,
+            "events": [],
             "raw_message": "",
         }
