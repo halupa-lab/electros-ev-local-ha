@@ -18,5 +18,45 @@
     "abort": {
       "already_configured": "This charger is already configured"
     }
+  },
+  "services": {
+    "set_timer": {
+      "name": "Set charging timer",
+      "description": "Sets the charging timer in the charger and sets the charger clock to Home Assistant time. Outside the window the charger does not charge, even after a start command.",
+      "fields": {
+        "start": {
+          "name": "Start",
+          "description": "Start of the charging window (charger local time)."
+        },
+        "end": {
+          "name": "End",
+          "description": "End of the charging window. May be on the next day, e.g. 23:00–07:00."
+        },
+        "config_entry_id": {
+          "name": "Charger",
+          "description": "Needed only when there is more than one charger."
+        }
+      }
+    },
+    "clear_timer": {
+      "name": "Clear charging timer",
+      "description": "Turns the charging timer off (the charger charges at any time) and sets the charger clock to Home Assistant time.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Charger",
+          "description": "Needed only when there is more than one charger."
+        }
+      }
+    },
+    "sync_clock": {
+      "name": "Sync charger clock",
+      "description": "Sets the charger clock to Home Assistant time and keeps the timer that is in the charger now.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Charger",
+          "description": "Needed only when there is more than one charger."
+        }
+      }
+    }
   }
 }

@@ -59,13 +59,32 @@ Copy `custom_components/electros_ev_local/` to your HA `config/custom_components
 | Charger clock offset | Sensor (s, diagnostic) | How far the charger clock is ahead (+) or behind (−) of HA; the timer runs on this clock. Attribute `charger_time` |
 | Last charger event | Sensor | Last entry of the charger's event log (timer allow / forbid, programming, errors). Attributes `code`, `event_en` (language-independent name, e.g. `timer_charging_blocked`), `time`, `recent` |
 
+## Actions
+
+| Action | What it does |
+|---|---|
+| `electros_ev_local.set_timer` | Sets the charging timer (`start`, `end`, e.g. `23:00` and `07:00`; the window may cross midnight) and the charger clock |
+| `electros_ev_local.clear_timer` | Turns the timer off (the charger charges at any time) and sets the charger clock |
+| `electros_ev_local.sync_clock` | Sets the charger clock and keeps the current timer |
+
+The charger clock is always set to Home Assistant local time: the charger has one command for the clock and the timer together. After the command the integration reads the charger back and the action fails if the timer or the clock (±15 s) is not what was asked, so an automation can retry or notify. `config_entry_id` is needed only with more than one charger.
+
+Outside the timer window the charger does not charge, even after "start" (Charging switch). The charger clock drifts about 15–20 s a day, so call `sync_clock` once a day.
+
+```yaml
+action: electros_ev_local.set_timer
+data:
+  start: "23:00"
+  end: "07:00"
+```
+
 ## How it works
 
 Connects directly to the charger's built-in WebSocket server (`ws://<ip>/ws`).
 No login required. Commands:
 - Start: `start\n{index}\n0`
 - Stop: `stop`
-- Timer (used by the charger's web page; not sent by this integration yet): `datetime\n<D.MM.YYYYTHH:MM:SS>\n<HH:MM start>\n<HH:MM stop>\n`, empty times = timer off. The same command also sets the charger clock.
+- Timer (the same command as "Задати" on the charger's web page; used by the actions below): `datetime\n<D.MM.YYYYTHH:MM:SS>\n<HH:MM start>\n<HH:MM stop>\n`, empty times = timer off. The same command also sets the charger clock.
 
 Fields of the state frame, counted from the line `electros.org.ua`: +3 configured amps, +4 status code, +6 voltage, +8 power ×10, +11 charger clock, +22 / +23 timer start / stop, +26 event log (`HH:MM:SS code ...`).
 

@@ -58,6 +58,32 @@ def parse_timer(start: str, stop: str) -> tuple[time, time] | None:
     return t_start, t_stop
 
 
+def timer_fields_valid(start: str, stop: str) -> bool:
+    """True when both timer fields are "HH:MM" (an off timer is "00:00" / "00:00").
+
+    Anything else means the frame layout is not what we expect, and re-sending "the current timer"
+    could silently clear a timer we failed to read.
+    """
+    return _parse_hhmm(start) is not None and _parse_hhmm(stop) is not None
+
+
+def format_clock(now: datetime) -> str:
+    """Local time in the format of the charger's web page: "12.11.2026T07:41:08" (day not zero-padded)."""
+    return f"{now.day}.{now:%m.%Y}T{now:%H:%M:%S}"
+
+
+def build_timer_command(now: datetime, timer: tuple[time, time] | None) -> str:
+    """The "datetime" command of the charger's web page ("Задати" on the timer tab).
+
+    It always sets the charger clock to `now` (local time) and either sets the timer window
+    or, with timer=None, turns the timer off (empty times, like the page does).
+    """
+    if timer is None:
+        return f"datetime\n{format_clock(now)}\n\n\n"
+    start, stop = timer
+    return f"datetime\n{format_clock(now)}\n{start:%H:%M}\n{stop:%H:%M}\n"
+
+
 def parse_events(value: str) -> list[tuple[str, str]]:
     """Event log "HH:MM:SS code HH:MM:SS code ..." -> [(time, code)], oldest first."""
     parts = value.split()
@@ -144,6 +170,7 @@ def parse_charger_state(message: str) -> dict:
     return {
         "clock": parse_clock(safe_str_rel(11)),
         "timer": parse_timer(safe_str_rel(22), safe_str_rel(23)),
+        "timer_valid": timer_fields_valid(safe_str_rel(22), safe_str_rel(23)),
         "events": parse_events(safe_str_rel(26)),
         "online": status_code != "7",
         "status_code": status_code,
@@ -296,6 +323,20 @@ class ElectroSLocalApi:
             _LOGGER.error("Failed to stop local charging: %s", exc)
             return False
 
+    async def set_timer(self, now: datetime, timer: tuple[time, time] | None) -> bool:
+        """Set the charger clock to `now` and set (or, with None, clear) the timer."""
+        try:
+            await self._ws_communicate(message=build_timer_command(now, timer))
+            _LOGGER.info(
+                "Local: sent timer %s with clock %s",
+                f"{timer[0]:%H:%M}-{timer[1]:%H:%M}" if timer else "off",
+                format_clock(now),
+            )
+            return True
+        except Exception as exc:
+            _LOGGER.error("Failed to set local charger timer: %s", exc)
+            return False
+
     async def test_connection(self) -> bool:
         """Test connection to local charger."""
         try:
@@ -317,6 +358,7 @@ class ElectroSLocalApi:
             "charging_power_w": None,
             "clock": None,
             "timer": None,
+            "timer_valid": False,
             "events": [],
             "raw_message": "",
         }

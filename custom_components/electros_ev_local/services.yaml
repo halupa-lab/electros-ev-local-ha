@@ -1,0 +1,33 @@
+set_timer:
+  fields:
+    start:
+      required: true
+      example: "23:00"
+      selector:
+        time:
+    end:
+      required: true
+      example: "07:00"
+      selector:
+        time:
+    config_entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: electros_ev_local
+
+clear_timer:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: electros_ev_local
+
+sync_clock:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: electros_ev_local
