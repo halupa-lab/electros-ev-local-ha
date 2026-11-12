@@ -190,6 +190,7 @@ class ElectroSLocalClockOffsetSensor(ElectroSLocalBaseSensor):
     _attr_icon = "mdi:clock-alert-outline"
     _attr_device_class = SensorDeviceClass.DURATION
     _attr_native_unit_of_measurement = "s"
+    _attr_suggested_display_precision = 0
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 

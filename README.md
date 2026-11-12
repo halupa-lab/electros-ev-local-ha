@@ -53,7 +53,7 @@ Copy `custom_components/electros_ev_local/` to your HA `config/custom_components
 | Measured current | Sensor (A) | Actual current |
 | Mains voltage | Sensor (V) | Grid voltage |
 | Charging power | Sensor (W) | Calculated power |
-| Charging | Switch | Start / stop charging |
+| Charging | Switch | Start / stop charging. Fails with an error when the charger does not get the command |
 | Charging amps | Number (slider) | Set amperage 6–32 A |
 | Charging timer | Sensor | Timer stored in the charger, e.g. `23:00–07:00`, or `вимкнено` (off). Attributes `enabled`, `start`, `end` |
 | Charger clock offset | Sensor (s, diagnostic) | How far the charger clock is ahead (+) or behind (−) of HA; the timer runs on this clock. Attribute `charger_time` |

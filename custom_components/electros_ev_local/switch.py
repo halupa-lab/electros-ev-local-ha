@@ -7,6 +7,7 @@ import logging
 from homeassistant.components.switch import SwitchDeviceClass, SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -51,8 +52,12 @@ class ElectroSLocalChargingSwitch(CoordinatorEntity[ElectroSLocalCoordinator], S
             return None
         return self.coordinator.data.get("status_text") in _CHARGING_STATUSES
 
+    # A failed command raises, so a script or automation stops (or can use continue_on_error)
+    # instead of silently assuming the charger got it.
     async def async_turn_on(self, **kwargs) -> None:
-        await self.coordinator.async_start_charging(self.coordinator.target_amps)
+        if not await self.coordinator.async_start_charging(self.coordinator.target_amps):
+            raise HomeAssistantError(f"Зарядка {self._host} не прийняла команду «почати»")
 
     async def async_turn_off(self, **kwargs) -> None:
-        await self.coordinator.async_stop_charging()
+        if not await self.coordinator.async_stop_charging():
+            raise HomeAssistantError(f"Зарядка {self._host} не прийняла команду «зупинити»")

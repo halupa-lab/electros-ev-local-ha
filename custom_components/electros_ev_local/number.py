@@ -8,6 +8,7 @@ from homeassistant.components.number import NumberDeviceClass, NumberEntity, Num
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfElectricCurrent
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -58,4 +59,7 @@ class ElectroSLocalAmpsNumber(CoordinatorEntity[ElectroSLocalCoordinator], Numbe
         amps = normalize_amps(int(value))
         if amps <= 0:
             return
-        await self.coordinator.async_set_amps(amps)
+        # While not charging nothing is sent (the value is used with the next start), so only
+        # a command that really went to the charger can fail here.
+        if not await self.coordinator.async_set_amps(amps):
+            raise HomeAssistantError(f"Зарядка {self._host} не прийняла струм {amps} A")
