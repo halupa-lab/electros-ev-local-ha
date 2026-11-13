@@ -59,6 +59,8 @@ Copy `custom_components/electros_ev_local/` to your HA `config/custom_components
 | Charger clock offset | Sensor (s, diagnostic) | How far the charger clock is ahead (+) or behind (−) of HA; the timer runs on this clock. Attribute `charger_time` |
 | Last charger event | Sensor | Last entry of the charger's event log (timer allow / forbid, programming, errors). Attributes `code`, `event_en` (language-independent name, e.g. `timer_charging_blocked`), `time`, `recent` |
 
+Entity IDs are fixed (since v1.8.0): `switch.electros_charging`, `number.electros_charging_current`, `sensor.electros_status`, `sensor.electros_set_current`, `sensor.electros_measured_current`, `sensor.electros_voltage`, `sensor.electros_power`, `sensor.electros_timer`, `sensor.electros_clock_offset`, `sensor.electros_last_event`. An install from before v1.8.0 keeps its old IDs until you press ↻ ("regenerate entity ID") in each entity's settings.
+
 ## Actions
 
 | Action | What it does |

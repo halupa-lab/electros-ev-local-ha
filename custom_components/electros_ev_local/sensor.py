@@ -21,6 +21,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import CONF_HOST, DOMAIN, EVENT_TEXT, EVENT_TEXT_EN, STATUS_TEXT
 from .coordinator import ElectroSLocalCoordinator
+from .entity_ids import suggested_entity_id
 
 
 async def async_setup_entry(
@@ -49,6 +50,7 @@ class ElectroSLocalBaseSensor(CoordinatorEntity[ElectroSLocalCoordinator], Senso
     def __init__(self, coordinator, entry, host) -> None:
         super().__init__(coordinator)
         self._host = host
+        self.entity_id = suggested_entity_id("sensor", self._entity_id_key)
         self._attr_device_info = {
             "identifiers": {(DOMAIN, host)},
             "name": f"ElectroS Local ({host})",
@@ -58,6 +60,7 @@ class ElectroSLocalBaseSensor(CoordinatorEntity[ElectroSLocalCoordinator], Senso
 
 
 class ElectroSLocalStatusSensor(ElectroSLocalBaseSensor):
+    _entity_id_key = "status"
     _attr_name = "Статус"
     _attr_icon = "mdi:ev-station"
 
@@ -84,6 +87,7 @@ class ElectroSLocalStatusSensor(ElectroSLocalBaseSensor):
 
 
 class ElectroSLocalCurrentAmpsSensor(ElectroSLocalBaseSensor):
+    _entity_id_key = "set_current"
     _attr_name = "Налаштований струм"
     _attr_native_unit_of_measurement = UnitOfElectricCurrent.AMPERE
     _attr_device_class = SensorDeviceClass.CURRENT
@@ -102,6 +106,7 @@ class ElectroSLocalCurrentAmpsSensor(ElectroSLocalBaseSensor):
 
 
 class ElectroSLocalMeasuredCurrentSensor(ElectroSLocalBaseSensor):
+    _entity_id_key = "measured_current"
     _attr_name = "Виміряний струм"
     _attr_native_unit_of_measurement = UnitOfElectricCurrent.AMPERE
     _attr_device_class = SensorDeviceClass.CURRENT
@@ -120,6 +125,7 @@ class ElectroSLocalMeasuredCurrentSensor(ElectroSLocalBaseSensor):
 
 
 class ElectroSLocalVoltageSensor(ElectroSLocalBaseSensor):
+    _entity_id_key = "voltage"
     _attr_name = "Напруга мережі"
     _attr_native_unit_of_measurement = UnitOfElectricPotential.VOLT
     _attr_device_class = SensorDeviceClass.VOLTAGE
@@ -137,6 +143,7 @@ class ElectroSLocalVoltageSensor(ElectroSLocalBaseSensor):
 
 
 class ElectroSLocalPowerSensor(ElectroSLocalBaseSensor):
+    _entity_id_key = "power"
     _attr_name = "Потужність зарядки"
     _attr_native_unit_of_measurement = UnitOfPower.WATT
     _attr_device_class = SensorDeviceClass.POWER
@@ -157,6 +164,7 @@ class ElectroSLocalPowerSensor(ElectroSLocalBaseSensor):
 class ElectroSLocalTimerSensor(ElectroSLocalBaseSensor):
     """Charging timer stored in the charger (read only). Outside the window the charger does not charge."""
 
+    _entity_id_key = "timer"
     _attr_name = "Таймер зарядки"
     _attr_icon = "mdi:timer-outline"
 
@@ -186,6 +194,7 @@ class ElectroSLocalTimerSensor(ElectroSLocalBaseSensor):
 class ElectroSLocalClockOffsetSensor(ElectroSLocalBaseSensor):
     """How far the charger clock is ahead (+) or behind (-) of HA time. The timer runs on this clock."""
 
+    _entity_id_key = "clock_offset"
     _attr_name = "Відхилення годинника зарядки"
     _attr_icon = "mdi:clock-alert-outline"
     _attr_device_class = SensorDeviceClass.DURATION
@@ -223,6 +232,7 @@ class ElectroSLocalClockOffsetSensor(ElectroSLocalBaseSensor):
 class ElectroSLocalLastEventSensor(ElectroSLocalBaseSensor):
     """Last entry of the charger's own event log (timer allow / forbid, programming, errors, ...)."""
 
+    _entity_id_key = "last_event"
     _attr_name = "Остання подія зарядки"
     _attr_icon = "mdi:message-text-clock-outline"
 

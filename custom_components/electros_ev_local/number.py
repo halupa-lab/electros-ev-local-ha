@@ -15,6 +15,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .charger_api import normalize_amps
 from .const import CONF_HOST, DOMAIN
 from .coordinator import ElectroSLocalCoordinator
+from .entity_ids import suggested_entity_id
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ async def async_setup_entry(
 
 
 class ElectroSLocalAmpsNumber(CoordinatorEntity[ElectroSLocalCoordinator], NumberEntity):
+    _entity_id_key = "charging_current"
     _attr_has_entity_name = True
     _attr_name = "Струм зарядки"
     _attr_icon = "mdi:current-ac"
@@ -43,6 +45,7 @@ class ElectroSLocalAmpsNumber(CoordinatorEntity[ElectroSLocalCoordinator], Numbe
     def __init__(self, coordinator, entry, host) -> None:
         super().__init__(coordinator)
         self._host = host
+        self.entity_id = suggested_entity_id("number", self._entity_id_key)
         self._attr_unique_id = f"local_{host}_charging_amps"
         self._attr_device_info = {
             "identifiers": {(DOMAIN, host)},

@@ -13,6 +13,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import CONF_HOST, DOMAIN
 from .coordinator import ElectroSLocalCoordinator
+from .entity_ids import suggested_entity_id
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ async def async_setup_entry(
 
 
 class ElectroSLocalChargingSwitch(CoordinatorEntity[ElectroSLocalCoordinator], SwitchEntity):
+    _entity_id_key = "charging"
     _attr_has_entity_name = True
     _attr_name = "Зарядка"
     _attr_icon = "mdi:ev-station"
@@ -38,6 +40,7 @@ class ElectroSLocalChargingSwitch(CoordinatorEntity[ElectroSLocalCoordinator], S
     def __init__(self, coordinator, entry, host) -> None:
         super().__init__(coordinator)
         self._host = host
+        self.entity_id = suggested_entity_id("switch", self._entity_id_key)
         self._attr_unique_id = f"local_{host}_charging_switch"
         self._attr_device_info = {
             "identifiers": {(DOMAIN, host)},
