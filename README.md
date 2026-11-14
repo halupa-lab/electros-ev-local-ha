@@ -71,7 +71,7 @@ Entity IDs are fixed (since v1.8.0): `switch.electros_charging`, `number.electro
 
 The charger clock is always set to Home Assistant local time: the charger has one command for the clock and the timer together. After the command the integration reads the charger back and the action fails if the timer or the clock (±15 s) is not what was asked, so an automation can retry or notify. `config_entry_id` is needed only with more than one charger.
 
-Outside the timer window the charger does not charge, even after "start" (Charging switch). The charger clock drifts about 15–20 s a day, so call `sync_clock` once a day.
+"Start" (Charging switch on) is a one-off override of the timer: the charger charges at once and the timer reads as off until "stop" or a timer command ends the override (unplugging does not end it); then the stored timer comes back by itself. The charger has no separate command for the current, so a new current while charging is sent with "start" too; when the charger was charging by its timer, the integration sends the same timer right after it, so the charge still stops at the timer end. The charger clock drifts about 15–20 s a day, so call `sync_clock` once a day.
 
 ```yaml
 action: electros_ev_local.set_timer

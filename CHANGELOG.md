@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.8.1
+
+- A new current while charging by the timer no longer switches the timer off. The charger takes the current only with "start", and "start" is a one-off override of the timer (it reads as off and the charge does not stop at the timer end). Now the integration sends the same timer right after it, so the charge goes on and stops at the timer end. In a one-off charge (timer already off) only the current is sent.
+- README: how "start", "stop" and the timer work together (owner's tests on the real charger).
+
 ## v1.8.0
 
 - Fixed English entity IDs without the IP: `switch.electros_charging`, `number.electros_charging_current`, `sensor.electros_status`, `sensor.electros_set_current`, `sensor.electros_measured_current`, `sensor.electros_voltage`, `sensor.electros_power`, `sensor.electros_timer`, `sensor.electros_clock_offset`, `sensor.electros_last_event`. Newer HA versions prefix the ID of a new entity with the device's area (e.g. `sensor.dvir_electros_…`); an ID set by the integration is used as is.

@@ -93,10 +93,18 @@ class ElectroSLocalCoordinator(DataUpdateCoordinator[dict]):
         self._user_set_amps = True
         self.async_update_listeners()
         if self.data and self.data.get("status_text") == "charging":
+            # The charger has no "set current" command: the new current goes with "start", and "start"
+            # is a one-off override of the timer (the timer then reads as off and the charge would not
+            # stop at the timer end). If it was charging by its timer, send the same timer again: that
+            # ends the override and the charge goes on by the timer (owner's tests 2026-11-14).
+            timer = self.data.get("timer") if self.data.get("timer_valid") else None
             success = await self.api.start_charging(amps)
             if success:
                 await asyncio.sleep(COMMAND_SETTLE_DELAY)
-                await self.async_request_refresh()
+                if timer is not None:
+                    await self.async_set_timer(timer)
+                else:
+                    await self.async_request_refresh()
             return success
         return True
 

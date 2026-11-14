@@ -49,7 +49,14 @@ class FakeCharger:
     def __init__(self, timer=None, clock_offset=timedelta(seconds=230), accepts=True, applies=True):
         self.timer, self.clock_offset, self.accepts, self.applies = timer, clock_offset, accepts, applies
         self.set_timer = AsyncMock(side_effect=self._set_timer)
+        self.start_charging = AsyncMock(side_effect=self._start)
         self._host = "192.168.1.124"
+        self.status = "charging"
+
+    async def _start(self, amps):
+        # "start" is a one-off override: the timer reads as off while it lasts.
+        self.timer = None
+        return True
 
     async def _set_timer(self, now, timer):
         if self.accepts and self.applies:
@@ -70,6 +77,7 @@ def coord(monkeypatch):
 
         def read():
             c.data = {
+                "status_text": charger.status,
                 "timer": charger.timer,
                 "timer_valid": timer_valid,
                 "clock": (NOW + charger.clock_offset).replace(tzinfo=None),
@@ -80,6 +88,9 @@ def coord(monkeypatch):
             read()
 
         c.async_refresh = async_refresh
+        c.async_request_refresh = async_refresh
+        c.async_update_listeners = lambda: None
+        c._user_set_amps = False
         read()
         return c
 
@@ -135,3 +146,36 @@ def test_set_timer_schema():
         SET_TIMER_SCHEMA({"start": "23:00", "end": "23:00"})
     with pytest.raises(vol.Invalid):
         SET_TIMER_SCHEMA({"start": "23:00"})
+
+
+def test_current_change_keeps_the_timer(coord):
+    # charging by the night timer: the new current goes with "start", then the timer is sent again
+    charger = FakeCharger(timer=NIGHT)
+    assert asyncio.run(coord(charger).async_set_amps(10)) is True
+    charger.start_charging.assert_awaited_once_with(10)
+    charger.set_timer.assert_awaited_once_with(datetime(2026, 11, 12, 7, 41, 8), NIGHT)
+    assert charger.timer == NIGHT
+
+
+def test_current_change_in_a_one_off_charge_sends_no_timer(coord):
+    # a one-off charge (timer reads as off): only the new current, the override stays
+    charger = FakeCharger(timer=None)
+    asyncio.run(coord(charger).async_set_amps(10))
+    charger.start_charging.assert_awaited_once_with(10)
+    charger.set_timer.assert_not_awaited()
+
+
+def test_current_change_while_not_charging_sends_nothing(coord):
+    charger = FakeCharger(timer=NIGHT)
+    charger.status = "waiting"
+    c = coord(charger)
+    asyncio.run(c.async_set_amps(10))
+    assert c.target_amps == 10
+    charger.start_charging.assert_not_awaited()
+    charger.set_timer.assert_not_awaited()
+
+
+def test_current_change_unreadable_timer_sends_no_timer(coord):
+    charger = FakeCharger(timer=NIGHT)
+    asyncio.run(coord(charger, timer_valid=False).async_set_amps(10))
+    charger.set_timer.assert_not_awaited()
