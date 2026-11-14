@@ -6,7 +6,9 @@ from custom_components.electros_ev_local.number import ElectroSLocalAmpsNumber
 from custom_components.electros_ev_local.sensor import (
     ElectroSLocalClockOffsetSensor,
     ElectroSLocalCurrentAmpsSensor,
+    ElectroSLocalLastCommandSensor,
     ElectroSLocalLastEventSensor,
+    ElectroSLocalLastRestartSensor,
     ElectroSLocalMeasuredCurrentSensor,
     ElectroSLocalPowerSensor,
     ElectroSLocalStatusSensor,
@@ -28,6 +30,8 @@ EXPECTED = {
     ElectroSLocalTimerSensor: "sensor.electros_timer",
     ElectroSLocalClockOffsetSensor: "sensor.electros_clock_offset",
     ElectroSLocalLastEventSensor: "sensor.electros_last_event",
+    ElectroSLocalLastRestartSensor: "sensor.electros_last_restart",
+    ElectroSLocalLastCommandSensor: "sensor.electros_last_command",
 }
 
 

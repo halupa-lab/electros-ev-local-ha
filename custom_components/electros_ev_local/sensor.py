@@ -16,9 +16,11 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
+from .charger_api import boot_log_start, boot_time
 from .const import CONF_HOST, DOMAIN, EVENT_TEXT, EVENT_TEXT_EN, STATUS_TEXT
 from .coordinator import ElectroSLocalCoordinator
 from .entity_ids import suggested_entity_id
@@ -41,6 +43,8 @@ async def async_setup_entry(
         ElectroSLocalTimerSensor(coordinator, entry, host),
         ElectroSLocalClockOffsetSensor(coordinator, entry, host),
         ElectroSLocalLastEventSensor(coordinator, entry, host),
+        ElectroSLocalLastRestartSensor(coordinator, entry, host),
+        ElectroSLocalLastCommandSensor(coordinator, entry, host),
     ])
 
 
@@ -264,3 +268,86 @@ class ElectroSLocalLastEventSensor(ElectroSLocalBaseSensor):
             "time": last_time,  # charger clock, local time
             "recent": [f"{t} {self._text(c)}" for t, c in events[-10:]],
         }
+
+
+class ElectroSLocalLastRestartSensor(ElectroSLocalBaseSensor, RestoreEntity):
+    """When the charger last started up (power cut, self-restart), from its own event log.
+
+    The log is cleared at start and begins with "Режим роутера" (25). A new log start = a new restart; it is
+    remembered (with a count) across HA restarts. Restarts while HA was away count as one if the log has
+    rolled over since, and are missed if the log no longer begins with 25.
+    """
+
+    _entity_id_key = "last_restart"
+    _attr_name = "Останній перезапуск зарядки"
+    _attr_icon = "mdi:restart-alert"
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator, entry, host) -> None:
+        super().__init__(coordinator, entry, host)
+        self._attr_unique_id = f"local_{host}_last_restart"
+        self._value = None       # when (HA time)
+        self._log_start = None   # first entry time of that log (charger clock), identifies the restart
+        self._count = 0
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        last = await self.async_get_last_state()
+        if last is not None:
+            self._value = dt_util.parse_datetime(last.state) if last.state not in ("unknown", "unavailable") else None
+            self._log_start = last.attributes.get("charger_log_start")
+            self._count = int(last.attributes.get("count") or 0)
+        self._update_from_frame()
+
+    def _update_from_frame(self) -> None:
+        data = self.coordinator.data or {}
+        events = data.get("events") or []
+        start = boot_log_start(events)
+        if start is None or start == self._log_start or data.get("received_at") is None:
+            return
+        when = boot_time(events, data.get("clock"), data["received_at"])
+        if when is None:
+            return
+        self._value, self._log_start, self._count = when, start, self._count + 1
+
+    def _handle_coordinator_update(self) -> None:
+        self._update_from_frame()
+        super()._handle_coordinator_update()
+
+    @property
+    def native_value(self):
+        return self._value
+
+    @property
+    def extra_state_attributes(self):
+        return {"count": self._count, "charger_log_start": self._log_start}
+
+
+class ElectroSLocalLastCommandSensor(ElectroSLocalBaseSensor):
+    """The last command HA sent to the charger and when (start, stop, timer); to compare with restarts."""
+
+    _entity_id_key = "last_command"
+    _attr_name = "Остання команда зарядці"
+    _attr_icon = "mdi:console-line"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator, entry, host) -> None:
+        super().__init__(coordinator, entry, host)
+        self._attr_unique_id = f"local_{host}_last_command"
+
+    @property
+    def available(self) -> bool:
+        return True  # known also while the charger is offline: that is when it matters
+
+    @property
+    def native_value(self):
+        cmd = getattr(self.coordinator, "last_command", None)
+        return cmd[0] if cmd else None
+
+    @property
+    def extra_state_attributes(self):
+        cmd = getattr(self.coordinator, "last_command", None)
+        if not cmd:
+            return {}
+        return {"sent_at": cmd[1].isoformat(), "delivered": cmd[2]}

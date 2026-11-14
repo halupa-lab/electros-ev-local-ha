@@ -45,6 +45,13 @@ class ElectroSLocalCoordinator(DataUpdateCoordinator[dict]):
         self.api = api
         self.target_amps: int = 6
         self._user_set_amps: bool = False
+        # The last command HA sent to the charger: (text, when, delivered). Shown as a diagnostic sensor,
+        # to compare with charger restarts.
+        self.last_command: tuple[str, object, bool] | None = None
+
+    def _note_command(self, text: str, delivered: bool) -> None:
+        self.last_command = (text, dt_util.utcnow(), delivered)
+        self.async_update_listeners()
 
     async def _async_update_data(self) -> dict:
         try:
@@ -70,6 +77,7 @@ class ElectroSLocalCoordinator(DataUpdateCoordinator[dict]):
         if amps <= 0:
             return False
         success = await self.api.start_charging(amps)
+        self._note_command(f"почати {amps} A", success)
         if success:
             self.target_amps = amps
             self._user_set_amps = True
@@ -79,6 +87,7 @@ class ElectroSLocalCoordinator(DataUpdateCoordinator[dict]):
 
     async def async_stop_charging(self) -> bool:
         success = await self.api.stop_charging()
+        self._note_command("зупинити", success)
         if success:
             for i in range(POST_STOP_REFRESHES):
                 await asyncio.sleep(COMMAND_SETTLE_DELAY if i == 0 else POST_STOP_INTERVAL)
@@ -99,6 +108,7 @@ class ElectroSLocalCoordinator(DataUpdateCoordinator[dict]):
             # ends the override and the charge goes on by the timer (owner's tests 2026-11-14).
             timer = self.data.get("timer") if self.data.get("timer_valid") else None
             success = await self.api.start_charging(amps)
+            self._note_command(f"почати {amps} A (новий струм)", success)
             if success:
                 await asyncio.sleep(COMMAND_SETTLE_DELAY)
                 if timer is not None:
@@ -125,7 +135,9 @@ class ElectroSLocalCoordinator(DataUpdateCoordinator[dict]):
         """Set the timer (None = off) and the charger clock to HA local time, then verify both."""
         host = self.api._host
         now = dt_util.now().replace(tzinfo=None)  # the charger clock has no time zone: local time
-        if not await self.api.set_timer(now, timer):
+        delivered = await self.api.set_timer(now, timer)
+        self._note_command(f"таймер {timer[0]:%H:%M}–{timer[1]:%H:%M}" if timer else "таймер вимкнено", delivered)
+        if not delivered:
             raise HomeAssistantError(f"Зарядка {host} не прийняла команду таймера")
         for _ in range(TIMER_VERIFY_READS):
             await asyncio.sleep(COMMAND_SETTLE_DELAY)

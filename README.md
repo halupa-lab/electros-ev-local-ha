@@ -58,8 +58,10 @@ Copy `custom_components/electros_ev_local/` to your HA `config/custom_components
 | Charging timer | Sensor | Timer stored in the charger, e.g. `23:00–07:00`, or `вимкнено` (off). Attributes `enabled`, `start`, `end` |
 | Charger clock offset | Sensor (s, diagnostic) | How far the charger clock is ahead (+) or behind (−) of HA; the timer runs on this clock. Attribute `charger_time` |
 | Last charger event | Sensor | Last entry of the charger's event log (timer allow / forbid, programming, errors). Attributes `code`, `event_en` (language-independent name, e.g. `timer_charging_blocked`), `time`, `recent` |
+| Last charger restart | Sensor (timestamp, diagnostic) | When the charger last started up (power cut or self-restart), from its event log, which starts again with "Режим роутера" (code 25). Attributes `count` (restarts seen, kept across HA restarts), `charger_log_start`. The history shows every restart |
+| Last command to the charger | Sensor (diagnostic) | The last command HA sent: `почати 16 A`, `зупинити`, `таймер 23:00–07:00`, … Attributes `sent_at`, `delivered` |
 
-Entity IDs are fixed (since v1.8.0): `switch.electros_charging`, `number.electros_charging_current`, `sensor.electros_status`, `sensor.electros_set_current`, `sensor.electros_measured_current`, `sensor.electros_voltage`, `sensor.electros_power`, `sensor.electros_timer`, `sensor.electros_clock_offset`, `sensor.electros_last_event`. An install from before v1.8.0 keeps its old IDs until you press ↻ ("regenerate entity ID") in each entity's settings.
+Entity IDs are fixed (since v1.8.0): `switch.electros_charging`, `number.electros_charging_current`, `sensor.electros_status`, `sensor.electros_set_current`, `sensor.electros_measured_current`, `sensor.electros_voltage`, `sensor.electros_power`, `sensor.electros_timer`, `sensor.electros_clock_offset`, `sensor.electros_last_event`, `sensor.electros_last_restart`, `sensor.electros_last_command`. An install from before v1.8.0 keeps its old IDs until you press ↻ ("regenerate entity ID") in each entity's settings.
 
 ## Actions
 

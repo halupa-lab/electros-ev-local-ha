@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.9.0
+
+- New diagnostic sensor "Останній перезапуск зарядки" (`sensor.electros_last_restart`): when the charger last started up, read from its own event log (cleared at start-up, begins with "Режим роутера", code 25). Attribute `count` counts restarts and survives HA restarts; the history lists every restart. After a restart the charger has no stop: with no timer, or inside the timer window, it charges.
+- New diagnostic sensor "Остання команда зарядці" (`sensor.electros_last_command`): the last start / stop / timer HA sent, with `sent_at` and `delivered`, to see whether restarts follow our commands.
+- The `set_timer` action description no longer says a start cannot charge outside the window: a start is a one-off override of the timer.
+
 ## v1.8.1
 
 - A new current while charging by the timer no longer switches the timer off. The charger takes the current only with "start", and "start" is a one-off override of the timer (it reads as off and the charge does not stop at the timer end). Now the integration sends the same timer right after it, so the charge goes on and stops at the timer end. In a one-off charge (timer already off) only the current is sent.

@@ -22,7 +22,7 @@
   "services": {
     "set_timer": {
       "name": "Set charging timer",
-      "description": "Sets the charging timer in the charger and sets the charger clock to Home Assistant time. Outside the window the charger does not charge, even after a start command.",
+      "description": "Sets the charging timer in the charger and sets the charger clock to Home Assistant time. Outside the window the charger does not start by itself; a start command is a one-off override.",
       "fields": {
         "start": {
           "name": "Start",

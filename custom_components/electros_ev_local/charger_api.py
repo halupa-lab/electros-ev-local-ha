@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 import logging
 import os
 import ssl
@@ -92,6 +92,34 @@ def parse_events(value: str) -> list[tuple[str, str]]:
         for i in range(0, len(parts) - 1, 2)
         if parts[i].count(":") == 2 and parts[i + 1].isdigit()
     ]
+
+
+# A charger that starts up writes "Режим роутера" (25) as the first entry of a fresh event log (13.11 19:34,
+# 14.11 05:34, 14.11 15:30 and 15:33: then 23 "Підключення до роутера" and 10). The log is cleared at start.
+BOOT_EVENT = "25"
+
+
+def boot_log_start(events: list[tuple[str, str]]) -> str | None:
+    """Charger clock time of the first entry of a log that begins with a start-up, else None."""
+    if events and events[0][1] == BOOT_EVENT:
+        return events[0][0]
+    return None
+
+
+def boot_time(events: list[tuple[str, str]], clock: datetime | None, received_at: datetime) -> datetime | None:
+    """When the charger started (HA time), from its fresh event log: the first entry's time is on the charger
+    clock, so it is taken relative to the frame's own clock (any clock offset cancels out). Within 24 h."""
+    start = boot_log_start(events)
+    if start is None or clock is None:
+        return None
+    try:
+        h, m, s = (int(x) for x in start.split(":"))
+    except ValueError:
+        return None
+    ago = (clock - clock.replace(hour=h, minute=m, second=s)).total_seconds()
+    if ago < 0:  # the start was before midnight on the charger clock
+        ago += 24 * 3600
+    return received_at - timedelta(seconds=ago)
 
 
 def parse_charger_state(message: str) -> dict:
