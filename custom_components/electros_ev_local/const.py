@@ -1,7 +1,9 @@
 """Constants for ElectroS EV Charger Local integration."""
 
 DOMAIN = "electros_ev_local"
-DEFAULT_SCAN_INTERVAL = 5  # local network — can poll faster
+# Every poll is a new connection to the charger's small web server (one at a time, closed properly).
+# The owner wants fresh state every 5 s; a longer interval can be set in the Configure dialog.
+DEFAULT_SCAN_INTERVAL = 5
 
 CONF_HOST = "host"
 CONF_PORT = "port"

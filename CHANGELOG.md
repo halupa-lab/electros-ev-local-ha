@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.10.0
+
+- Gentler on the charger's small web server: one connection at a time (polls and commands wait for each other), and every connection is closed properly, with a WebSocket close frame, also after a timeout or an error (before, a timed-out connection was left open and nothing said goodbye).
+- The poll interval can be changed in the integration's Configure dialog (default stays 5 s).
+- A failed read names the error type in the log ("TimeoutError" instead of an empty message).
+- The raw state frame (it holds the charger's passwords) is no longer kept in memory.
+
 ## v1.9.0
 
 - New diagnostic sensor "Останній перезапуск зарядки" (`sensor.electros_last_restart`): when the charger last started up, read from its own event log (cleared at start-up, begins with "Режим роутера", code 25). Attribute `count` counts restarts and survives HA restarts; the history lists every restart. After a restart the charger has no stop: with no timer, or inside the timer window, it charges.

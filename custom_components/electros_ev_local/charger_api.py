@@ -207,8 +207,16 @@ def parse_charger_state(message: str) -> dict:
         "measured_current": measured_current,
         "mains_voltage": mains_voltage,
         "charging_power_w": charging_power_w,
-        "raw_message": message,  # keep for debugging
     }
+
+
+# Seconds to wait for the charger at each step of an exchange.
+READ_TIMEOUT = 10
+
+
+def _describe(exc: BaseException) -> str:
+    """A timeout has an empty message ("Failed to get local charger state: "): name the type too."""
+    return f"{type(exc).__name__}: {exc}" if str(exc) else type(exc).__name__
 
 
 class ElectroSLocalApi:
@@ -224,15 +232,42 @@ class ElectroSLocalApi:
         self._host = host
         self._port = port
         self._ws_path = ws_path
+        # The charger's small web server: one connection at a time (polls and commands wait for each other).
+        self._lock = asyncio.Lock()
 
     async def _ws_communicate(self, message: str | None = None) -> str | None:
-        """Open WebSocket, optionally send message, receive response."""
-        key = base64.b64encode(os.urandom(16)).decode()
+        """One exchange: open a WebSocket, optionally send a message, read one frame, close it properly.
 
-        reader, writer = await asyncio.wait_for(
-            asyncio.open_connection(self._host, self._port),
-            timeout=10,
-        )
+        One at a time, and the socket is always closed (also on a timeout or error), with a WebSocket close
+        frame first, so no half-open connections are left in the charger.
+        """
+        async with self._lock:
+            reader, writer = await asyncio.wait_for(
+                asyncio.open_connection(self._host, self._port),
+                timeout=READ_TIMEOUT,
+            )
+            try:
+                return await self._exchange(reader, writer, message)
+            finally:
+                await self._close(writer)
+
+    async def _close(self, writer) -> None:
+        try:
+            # Close frame (opcode 8), masked like every client frame, status 1000 "normal closure".
+            mask = os.urandom(4)
+            payload = struct.pack("!H", 1000)
+            writer.write(bytes([0x88, 0x80 | len(payload)]) + mask + bytes(b ^ mask[i % 4] for i, b in enumerate(payload)))
+            await asyncio.wait_for(writer.drain(), timeout=2)
+        except Exception:  # noqa: BLE001 - the socket is closed below anyway
+            pass
+        writer.close()
+        try:
+            await asyncio.wait_for(writer.wait_closed(), timeout=2)
+        except Exception:  # noqa: BLE001
+            pass
+
+    async def _exchange(self, reader, writer, message: str | None) -> str | None:
+        key = base64.b64encode(os.urandom(16)).decode()
 
         request = (
             f"GET {self._ws_path} HTTP/1.1\r\n"
@@ -249,13 +284,12 @@ class ElectroSLocalApi:
         # Read HTTP upgrade response
         response = b""
         while b"\r\n\r\n" not in response:
-            chunk = await asyncio.wait_for(reader.read(4096), timeout=10)
+            chunk = await asyncio.wait_for(reader.read(4096), timeout=READ_TIMEOUT)
             if not chunk:
                 break
             response += chunk
 
         if b"101 Switching Protocols" not in response:
-            writer.close()
             raise RuntimeError(f"WebSocket upgrade failed: {response[:200]}")
 
         # Send command if provided
@@ -263,9 +297,7 @@ class ElectroSLocalApi:
             await self._send_ws_frame(writer, message)
 
         # Receive one frame (the status update)
-        result = await self._recv_ws_frame(reader)
-        writer.close()
-        return result
+        return await self._recv_ws_frame(reader)
 
     async def _send_ws_frame(self, writer, text: str) -> None:
         """Send a masked WebSocket text frame."""
@@ -288,7 +320,7 @@ class ElectroSLocalApi:
 
     async def _recv_ws_frame(self, reader) -> str | None:
         """Receive a WebSocket frame."""
-        first = await asyncio.wait_for(reader.readexactly(2), timeout=10)
+        first = await asyncio.wait_for(reader.readexactly(2), timeout=READ_TIMEOUT)
         byte1, byte2 = first
         opcode = byte1 & 0x0F
         frame_length = byte2 & 0x7F
@@ -301,7 +333,7 @@ class ElectroSLocalApi:
         recv_payload = b""
         while len(recv_payload) < frame_length:
             chunk = await asyncio.wait_for(
-                reader.read(frame_length - len(recv_payload)), timeout=10
+                reader.read(frame_length - len(recv_payload)), timeout=READ_TIMEOUT
             )
             if not chunk:
                 break
@@ -322,8 +354,8 @@ class ElectroSLocalApi:
                 return self._offline_state("invalid_response")
             return parse_charger_state(response)
         except Exception as exc:
-            _LOGGER.error("Failed to get local charger state: %s", exc)
-            return self._offline_state(f"error: {exc}")
+            _LOGGER.error("Failed to get local charger state: %s", _describe(exc))
+            return self._offline_state(f"error: {_describe(exc)}")
 
     async def start_charging(self, amps: int) -> bool:
         """Start charging at specified amperage."""
@@ -337,7 +369,7 @@ class ElectroSLocalApi:
             _LOGGER.info("Local: sent start command with %dA (index %d)", amps, index)
             return True
         except Exception as exc:
-            _LOGGER.error("Failed to start local charging: %s", exc)
+            _LOGGER.error("Failed to start local charging: %s", _describe(exc))
             return False
 
     async def stop_charging(self) -> bool:
@@ -348,7 +380,7 @@ class ElectroSLocalApi:
             _LOGGER.info("Local: sent stop command")
             return True
         except Exception as exc:
-            _LOGGER.error("Failed to stop local charging: %s", exc)
+            _LOGGER.error("Failed to stop local charging: %s", _describe(exc))
             return False
 
     async def set_timer(self, now: datetime, timer: tuple[time, time] | None) -> bool:
@@ -362,7 +394,7 @@ class ElectroSLocalApi:
             )
             return True
         except Exception as exc:
-            _LOGGER.error("Failed to set local charger timer: %s", exc)
+            _LOGGER.error("Failed to set local charger timer: %s", _describe(exc))
             return False
 
     async def test_connection(self) -> bool:
@@ -388,5 +420,4 @@ class ElectroSLocalApi:
             "timer": None,
             "timer_valid": False,
             "events": [],
-            "raw_message": "",
         }
